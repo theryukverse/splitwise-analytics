@@ -1,43 +1,50 @@
 import logging
-from datetime import date, datetime
+from functools import wraps
 
-import pandas as pd
-import plotly.express as px
-from dateutil.relativedelta import relativedelta
-from flask import Blueprint, render_template, send_from_directory, abort, redirect, request
+from flask import (Blueprint, render_template, abort, redirect, request,
+                   session, jsonify)
 
-from util import *
+from util import (
+    get_authorization_url, get_https_redirect_call_back_url,
+    set_access_token, update_session_with_current_user,
+    get_dashboard_summary, fetch_expenses, aggregate_monthly,
+    aggregate_categories, get_friends_with_balances,
+    get_groups_with_balances, get_my_share, _parse_date,
+)
 
-views = Blueprint(__name__, "views")
-logging.basicConfig(level=logging.DEBUG)
+views = Blueprint("views", __name__)
+logging.basicConfig(level=logging.INFO)
 
 
-@views.route('/static/<path:filename>')
-def serve_static(filename):
-    return send_from_directory('static', filename)
+# ---------------------------------------------------------------------------
+# Auth decorator
+# ---------------------------------------------------------------------------
 
-
-def login_is_required(function):
+def login_required(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
         if "access_token" not in session:
-            return abort(401)
-        else:
-            return function()
-
+            return redirect("/login")
+        return f(*args, **kwargs)
     return wrapper
 
 
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+
 @views.route("/login")
 def login():
-    authorization_url = get_authorization_url(get_https_redirect_call_back_url(request.root_url))
-    return redirect(authorization_url)
+    url = get_authorization_url(get_https_redirect_call_back_url(request.root_url))
+    return redirect(url)
 
 
 @views.route("/callback")
 def callback():
-    if not session["state"] == request.args["state"]:
-        abort(500)
-    set_access_token(request.args["code"], get_https_redirect_call_back_url(request.root_url))
+    if session.get("state") != request.args.get("state"):
+        abort(500, "State mismatch")
+    set_access_token(request.args["code"],
+                     get_https_redirect_call_back_url(request.root_url))
     return redirect("/")
 
 
@@ -47,40 +54,152 @@ def logout():
     return redirect("/")
 
 
+# ---------------------------------------------------------------------------
+# Page routes
+# ---------------------------------------------------------------------------
+
 @views.route("/")
 def home():
-    if "access_token" in session:
-        return render_template("home.html")
-    return render_template("welcome.html")
+    if "access_token" not in session:
+        return render_template("welcome.html")
+    update_session_with_current_user()
+    return render_template("home.html")
 
 
-@views.route("/year_data_grouped_by_month")
-@login_is_required
-def year_data_grouped_by_month():
-    months_before = 12
-    client = get_splitwise_client()
-    update_session_with_current_user_data()
-    start_date = date.today() - relativedelta(months=int(months_before))
-    expenses = client.getExpenses(dated_after=str(start_date), friend_id=session["id"], visible=True, limit=999999)
-    df = pd.DataFrame.from_records(vars(o) for o in expenses)
-    df = df.query('payment == False')
-    df = df.query("creation_method != 'debt_consolidation'")
-    df = df.query("currency_code == '{}'".format(session["default_currency"]))
+@views.route("/monthly")
+@login_required
+def monthly():
+    update_session_with_current_user()
+    return render_template("monthly.html")
 
-    data = pd.DataFrame()
-    data["month"] = df["date"].apply(
-        lambda date: datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m"))
-    data["category"] = df["category"].apply(lambda category: category.getName())
-    data["cost"] = df["users"].apply(get_my_spending)
 
-    data_group_by_month = data.groupby(['month', 'category']).agg({'cost': 'sum'}).reset_index()
+@views.route("/categories")
+@login_required
+def categories():
+    update_session_with_current_user()
+    return render_template("categories.html")
 
-    fig = px.bar(data_group_by_month, x='month', y='cost', color='category',
-                 barmode='stack')
-    fig.update_layout(
-        xaxis_title='Month',
-        paper_bgcolor='rgba(0,0,0,0)',
-        yaxis_title='Cost ({})'.format(session["default_currency"])
-    )
-    graph_html = fig.to_html(full_html=False)
-    return render_template('year_data_grouped_by_month.html', graph_html=graph_html)
+
+@views.route("/groups")
+@login_required
+def groups():
+    update_session_with_current_user()
+    return render_template("groups.html")
+
+
+@views.route("/groups/<int:group_id>")
+@login_required
+def group_detail(group_id):
+    update_session_with_current_user()
+    return render_template("group_detail.html", group_id=group_id)
+
+
+@views.route("/friends")
+@login_required
+def friends():
+    update_session_with_current_user()
+    return render_template("friends.html")
+
+
+@views.route("/trends")
+@login_required
+def trends():
+    update_session_with_current_user()
+    return render_template("trends.html")
+
+
+# ---------------------------------------------------------------------------
+# JSON API routes
+# ---------------------------------------------------------------------------
+
+@views.route("/api/dashboard")
+@login_required
+def api_dashboard():
+    return jsonify(get_dashboard_summary())
+
+
+@views.route("/api/monthly-spending")
+@login_required
+def api_monthly_spending():
+    months = request.args.get("months", 12, type=int)
+    expenses = fetch_expenses(months=months)
+    monthly = aggregate_monthly(expenses)
+    # Sort months chronologically
+    sorted_months = sorted(monthly.keys())
+    # Collect all unique categories
+    all_cats = set()
+    for cats in monthly.values():
+        all_cats.update(cats.keys())
+    all_cats = sorted(all_cats)
+
+    datasets = {}
+    for cat in all_cats:
+        datasets[cat] = [round(monthly.get(m, {}).get(cat, 0), 2)
+                         for m in sorted_months]
+
+    return jsonify({
+        "labels": sorted_months,
+        "datasets": datasets,
+        "currency": session.get("default_currency", "USD"),
+    })
+
+
+@views.route("/api/category-breakdown")
+@login_required
+def api_category_breakdown():
+    months = request.args.get("months", 12, type=int)
+    expenses = fetch_expenses(months=months)
+    cats = aggregate_categories(expenses)
+    sorted_cats = sorted(cats.items(), key=lambda x: x[1], reverse=True)
+    return jsonify({
+        "labels": [c[0] for c in sorted_cats],
+        "values": [round(c[1], 2) for c in sorted_cats],
+        "currency": session.get("default_currency", "USD"),
+    })
+
+
+@views.route("/api/groups")
+@login_required
+def api_groups():
+    return jsonify(get_groups_with_balances())
+
+
+@views.route("/api/group/<int:group_id>/expenses")
+@login_required
+def api_group_expenses(group_id):
+    expenses = fetch_expenses(months=12, group_id=group_id)
+    currency = session.get("default_currency", "USD")
+    result = []
+    for e in expenses:
+        result.append({
+            "id": e.getId(),
+            "description": e.getDescription(),
+            "cost": float(e.getCost()),
+            "my_share": get_my_share(e.getUsers()),
+            "currency": e.getCurrencyCode(),
+            "date": e.getDate(),
+            "category": e.getCategory().getName() if e.getCategory() else "Uncategorized",
+        })
+    result.sort(key=lambda x: x["date"], reverse=True)
+    return jsonify({"expenses": result, "currency": currency})
+
+
+@views.route("/api/friends")
+@login_required
+def api_friends():
+    return jsonify(get_friends_with_balances())
+
+
+@views.route("/api/trends")
+@login_required
+def api_trends():
+    months = request.args.get("months", 12, type=int)
+    expenses = fetch_expenses(months=months)
+    monthly = aggregate_monthly(expenses)
+    sorted_months = sorted(monthly.keys())
+    totals = [round(sum(monthly[m].values()), 2) for m in sorted_months]
+    return jsonify({
+        "labels": sorted_months,
+        "totals": totals,
+        "currency": session.get("default_currency", "USD"),
+    })

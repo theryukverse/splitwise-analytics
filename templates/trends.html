@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Spending Trends — Splitwise Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1>Spending Trends</h1>
+    <p>Track how your total spending changes over time.</p>
+</div>
+
+<div class="card animate-in">
+    <div class="card-header">
+        <h3>Monthly Total Spending</h3>
+        <select id="trendRange" class="form-select" onchange="loadTrends()">
+            <option value="6">Last 6 months</option>
+            <option value="12" selected>Last 12 months</option>
+            <option value="24">Last 24 months</option>
+        </select>
+    </div>
+    <div class="chart-container" style="height:400px;">
+        <canvas id="trendChart"></canvas>
+    </div>
+</div>
+
+<div class="stat-grid" style="margin-top:24px;" id="trendStats">
+    <div class="stat-card orange animate-in">
+        <div class="stat-icon">📊</div>
+        <div class="stat-label">Average / Month</div>
+        <div class="stat-value" id="avgMonth">—</div>
+    </div>
+    <div class="stat-card teal animate-in">
+        <div class="stat-icon">📉</div>
+        <div class="stat-label">Lowest Month</div>
+        <div class="stat-value" id="lowestMonth">—</div>
+    </div>
+    <div class="stat-card red animate-in">
+        <div class="stat-icon">📈</div>
+        <div class="stat-label">Highest Month</div>
+        <div class="stat-value" id="highestMonth">—</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let trendChartInstance = null;
+
+    async function loadTrends() {
+        const months = document.getElementById('trendRange').value;
+        const res = await fetch('/api/trends?months=' + months);
+        const d = await res.json();
+
+        if (trendChartInstance) trendChartInstance.destroy();
+        trendChartInstance = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: d.labels,
+                datasets: [{
+                    label: 'Total Spending',
+                    data: d.totals,
+                    borderColor: '#1cc29f',
+                    backgroundColor: 'rgba(28, 194, 159, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#1cc29f',
+                    borderWidth: 2.5,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => d.currency + ' ' + ctx.parsed.y.toLocaleString() } },
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { ticks: { callback: v => d.currency + ' ' + v }, beginAtZero: true },
+                },
+            },
+        });
+
+        // Stats
+        if (d.totals.length) {
+            const avg = d.totals.reduce((a, b) => a + b, 0) / d.totals.length;
+            const min = Math.min(...d.totals);
+            const max = Math.max(...d.totals);
+            document.getElementById('avgMonth').textContent = d.currency + ' ' + avg.toLocaleString(undefined, { maximumFractionDigits: 0 });
+            document.getElementById('lowestMonth').textContent = d.currency + ' ' + min.toLocaleString(undefined, { maximumFractionDigits: 0 });
+            document.getElementById('highestMonth').textContent = d.currency + ' ' + max.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        }
+    }
+
+    loadTrends();
+</script>
+{% endblock %}

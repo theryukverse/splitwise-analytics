@@ -1,4 +1,30 @@
+# Virtual Environment
 /venv/
-/.env
+env/
+
+# Environment Variables
+.env
+.env.local
+
+# IDEs
 /.idea
-/.DS_Store
+.vscode/
+
+# Build and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log

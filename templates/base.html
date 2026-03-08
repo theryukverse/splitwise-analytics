@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Splitwise Analytics{% endblock %}</title>
+    <meta name="description" content="Premium analytics dashboard for your Splitwise expenses">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar">
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+    <span style="font-weight:700;font-size:1.05rem;">Splitwise Analytics</span>
+    <div style="width:36px;"></div>
+</div>
+
+<!-- Sidebar overlay for mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">S</div>
+        <span class="brand-text">Splitwise Analytics</span>
+    </div>
+
+    <div class="sidebar-nav">
+        <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+            <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="/monthly" class="nav-link {% if request.path == '/monthly' %}active{% endif %}">
+            <span class="nav-icon">📅</span> Monthly Spending
+        </a>
+        <a href="/categories" class="nav-link {% if request.path == '/categories' %}active{% endif %}">
+            <span class="nav-icon">🏷️</span> Categories
+        </a>
+        <a href="/groups" class="nav-link {% if '/groups' in request.path %}active{% endif %}">
+            <span class="nav-icon">👥</span> Groups
+        </a>
+        <a href="/friends" class="nav-link {% if request.path == '/friends' %}active{% endif %}">
+            <span class="nav-icon">🤝</span> Friends
+        </a>
+        <a href="/trends" class="nav-link {% if request.path == '/trends' %}active{% endif %}">
+            <span class="nav-icon">📈</span> Trends
+        </a>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="user-card">
+            {% if session.get('avatar_url') %}
+                <img src="{{ session.avatar_url }}" alt="avatar" class="user-avatar">
+            {% else %}
+                <div class="user-avatar-placeholder">{{ (session.get('first_name', 'U'))[0] }}</div>
+            {% endif %}
+            <div class="user-info">
+                <div class="user-name">{{ session.get('first_name', 'User') }} {{ session.get('last_name', '') }}</div>
+                <div class="user-email">{{ session.get('email', '') }}</div>
+            </div>
+        </div>
+        <a href="/logout" class="logout-link">
+            <span>🚪</span> Sign out
+        </a>
+    </div>
+</nav>
+
+<!-- Main -->
+<div class="app-shell">
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<script>
+    // Mobile sidebar toggle
+    const toggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        });
+    }
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        });
+    }
+
+    // Chart.js global defaults
+    Chart.defaults.color = '#9a9ab0';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    const CHART_COLORS = [
+        '#1cc29f', '#5b8cff', '#a473db', '#ff9f43', '#ff5c5c',
+        '#36d7b7', '#6c5ce7', '#fd79a8', '#00cec9', '#ffeaa7',
+        '#dfe6e9', '#74b9ff', '#e17055', '#00b894', '#e84393',
+        '#0984e3', '#fdcb6e', '#b2bec3', '#55efc4', '#fab1a0',
+    ];
+</script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

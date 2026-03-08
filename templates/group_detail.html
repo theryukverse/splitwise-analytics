@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Group Expenses — Splitwise Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1>Group Expenses</h1>
+    <p><a href="/groups" style="color:var(--accent-teal);">← Back to groups</a></p>
+</div>
+
+<div class="card animate-in" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3>Expense Breakdown</h3>
+    </div>
+    <div class="chart-container" style="max-width:400px;margin:0 auto;">
+        <canvas id="groupCatChart"></canvas>
+    </div>
+</div>
+
+<div class="card animate-in">
+    <div class="card-header">
+        <h3>Recent Expenses</h3>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Total Cost</th>
+                    <th>Your Share</th>
+                </tr>
+            </thead>
+            <tbody id="expenseBody">
+                <tr>
+                    <td colspan="5">
+                        <div class="spinner-wrap">
+                            <div class="spinner"></div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (async () => {
+        const groupId = {{ group_id }
+    };
+    const res = await fetch('/api/group/' + groupId + '/expenses');
+    const d = await res.json();
+    const body = document.getElementById('expenseBody');
+
+    if (!d.expenses.length) {
+        body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><p>No expenses found.</p></div></td></tr>';
+        return;
+    }
+
+    body.innerHTML = d.expenses.map(e => {
+        const dt = new Date(e.date);
+        const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return '<tr>' +
+            '<td>' + dateStr + '</td>' +
+            '<td>' + e.description + '</td>' +
+            '<td><span class="badge badge-teal">' + e.category + '</span></td>' +
+            '<td>' + e.currency + ' ' + e.cost.toLocaleString() + '</td>' +
+            '<td style="font-weight:600;">' + d.currency + ' ' + e.my_share.toLocaleString() + '</td>' +
+            '</tr>';
+    }).join('');
+
+    // Category breakdown for this group
+    const catMap = {};
+    d.expenses.forEach(e => {
+        catMap[e.category] = (catMap[e.category] || 0) + e.my_share;
+    });
+    const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+
+    new Chart(document.getElementById('groupCatChart'), {
+        type: 'doughnut',
+        data: {
+            labels: cats.map(c => c[0]),
+            datasets: [{
+                data: cats.map(c => Math.round(c[1] * 100) / 100),
+                backgroundColor: CHART_COLORS.slice(0, cats.length),
+                borderWidth: 0,
+                hoverOffset: 8,
+            }],
+        },
+        options: {
+            responsive: true,
+            cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+            },
+        },
+    });
+}) ();
+</script>
+{% endblock %}

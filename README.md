@@ -1,70 +1,64 @@
 # Splitwise Analytics
-Splitwise Analytics is an application designed to enhance your Splitwise experience by providing insightful graphs and analytics through OAuth 2.0 authentication.
 
-### Features
-- **OAuth 2.0 Integration:** Utilizes OAuth 2.0 for secure authentication and access to Splitwise.
-- **Spending's Per Month:** This will show the spending's of last 12 months grouped by month.
-- More features coming soon
+A premium analytics dashboard for your Splitwise expenses. Connect via OAuth 2.0 and unlock powerful insights into your spending patterns, category breakdowns, group finances, and more.
 
-### Screenshots
-![welcome_screenshot](README/welcome_screenshot.png)
-![home_screenshot](README/home_screenshot.png)
-![spendings_per_month_screenshot](README/spendings_per_month_screenshot.png)
+## Features
 
-### FAQ
+- **Dashboard** — At-a-glance summary: balances, groups count, friends count, plus mini charts
+- **Monthly Spending** — Stacked bar chart of expenses by category, with date-range selector and data table
+- **Category Breakdown** — Doughnut chart showing where your money goes, with percentage table
+- **Groups** — All your Splitwise groups with balance summaries; click through for group-level expense details
+- **Friends** — Friend list with multi-currency balance indicators
+- **Spending Trends** — Line chart of month-over-month total spending with average/min/max stats
+- **Secure OAuth 2.0** — No passwords stored; uses Splitwise's official OAuth flow
 
-- **1: What if you have expenses of multiple currencies?** 
+## Tech Stack
 
-  Only default currency expenses are used by this application. Select preferred currency as default currency in your splitwise app and then use splitwise analytics.
+- **Backend:** Python / Flask
+- **Frontend:** Jinja2 templates, Chart.js, vanilla CSS (dark glassmorphism design)
+- **API:** Splitwise Python SDK (`splitwise`)
+- **Deployment:** Docker + Nginx reverse proxy
 
+## Getting Started
 
-### Getting Started
+### 1. Set Up OAuth Credentials
 
-- Set Up OAuth 2.0 Credentials
-  - Visit the Splitwise Developer Portal (https://www.splitwise.com/apps) and create a new application
-  - Obtain your Consumer key and Consumer Secret ![register_your_app](README/register_your_app.png)
+1. Go to the [Splitwise Developer Portal](https://www.splitwise.com/apps)
+2. Create a new application
+3. Note your **Consumer Key** and **Consumer Secret**
 
-## Run with docker image
+### 2. Configure Environment
 
-- **Pull Docker image**
-  ```commandline
-  docker pull ghcr.io/ravitejalam/splitwise-analytics:latest
-  ```
+Create a `.env` file in the project root:
 
-- **Run docker image**
-  ```commandline
-  docker run -d -p 8000:80 -e CONSUMER_KEY=<CONSUMER_KEY> -e CONSUMER_SECRET=<CONSUMER_SECRET> splitwise-analytics:latest
-  ```
-- **Access the Dashboard:**
+```
+CONSUMER_KEY = "your_key_here"
+CONSUMER_SECRET = "your_secret_here"
+```
 
-   Open your web browser and navigate to http://localhost to access the Splitwise Analytics dashboard.
+### 3. Run Locally
 
-### OR
+```bash
+pip install -r requirements.txt
+python app.py
+```
 
-## Build and run flask app
+Open http://127.0.0.1:5000 in your browser.
 
-- **Clone the Repository:**
-  ```bash
-  git clone https://github.com/RavitejaLam/splitwise-analytics.git
-  ```
-- **Install Dependencies:**
-    ```bash
-    cd splitwise-analytics
-    pip install -r requirements.txt
-    ```
-- Set these credentials in the `.env` file
-    ```
-    CONSUMER_KEY = "******"
-    CONSUMER_SECRET = "******"
-    ```
-- **Run the Application:**
-    ```commandline
-    python app.py
-    ```
-- **Access the Dashboard:**
+### 4. Run with Docker
 
-   Open your web browser and navigate to http://localhost to access the Splitwise Analytics dashboard.
+```bash
+docker compose up -d
+```
 
-### Acknowledgements
-- This project utilizes the Splitwise API (https://dev.splitwise.com/) to retrieve user data.
-- Special thanks to the contributors and the Splitwise community for their support and inspiration.
+Open http://localhost in your browser.
+
+## FAQ
+
+**What if I have expenses in multiple currencies?**
+Only your default currency expenses are used for charts and analytics. Set your preferred currency as the default in the Splitwise app.
+
+## Acknowledgements
+
+- [Splitwise API](https://dev.splitwise.com/)
+- [Chart.js](https://www.chartjs.org/)

@@ -1,73 +1,123 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+{% extends "base.html" %}
+{% block title %}Dashboard — Splitwise Analytics{% endblock %}
 
-<head>
-    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet" type="text/css">
-    <title>Home</title>
-</head>
+{% block content %}
+<div class="page-header animate-in">
+    <h1>Dashboard</h1>
+    <p>Welcome back! Here's your financial snapshot.</p>
+</div>
 
-<body>
-<div class="header-div">
-    <a href="/"><img alt="Logo" height="65"
-                     src="{{ url_for('static', filename='images/header.svg') }}"
-                     title="Logo"></a>
-    <a class="es-button" href="/logout">Logout</a>
+<!-- Stat cards (filled via JS) -->
+<div class="stat-grid" id="statGrid">
+    <div class="stat-card teal animate-in">
+        <div class="stat-icon">💰</div>
+        <div class="stat-label">You are owed</div>
+        <div class="stat-value" id="statOwed">—</div>
+    </div>
+    <div class="stat-card red animate-in">
+        <div class="stat-icon">💸</div>
+        <div class="stat-label">You owe</div>
+        <div class="stat-value" id="statOwe">—</div>
+    </div>
+    <div class="stat-card purple animate-in">
+        <div class="stat-icon">👥</div>
+        <div class="stat-label">Groups</div>
+        <div class="stat-value" id="statGroups">—</div>
+    </div>
+    <div class="stat-card blue animate-in">
+        <div class="stat-icon">🤝</div>
+        <div class="stat-label">Friends</div>
+        <div class="stat-value" id="statFriends">—</div>
+    </div>
 </div>
-<div class="main-div dashboard-container">
-    <a class="dashboard-link" href="year_data_grouped_by_month">
-        <div class="dashboard">
-            <img alt="Grouped by month bar graph" class="dashboard-image"
-                 src="{{ url_for('static', filename='images/group_by_month_example.png') }}">
-            <div class="dashboard-text">
-                <h2>Spending's Per Month</h2>
-                <p>This will show the spending's of last 12 months grouped by month.</p>
-            </div>
-        </div>
-    </a>
-    <a class="dashboard-link">
-        <div class="dashboard">
-            <img alt="Nested pie chart graph" class="dashboard-image"
-                 src="{{ url_for('static', filename='images/coming_soon.avif') }}">
-            <div class="dashboard-text">
-                <h2>Nested Pie Chart</h2>
-                <p>This will show the spending's in Nested pie chart. </p>
-            </div>
-        </div>
-    </a>
-    <a class="dashboard-link">
-        <div class="dashboard">
-            <img alt="Rate of Change per category" class="dashboard-image"
-                 src="{{ url_for('static', filename='images/coming_soon.avif') }}">
-            <div class="dashboard-text">
-                <h2>Rate of Change</h2>
-                <p>This will show the at which the spending's rate changes per category. </p>
-            </div>
-        </div>
-    </a>
-    <br><br>
-</div>
-<div class="footer-div">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 91"
-         class="w-full">
-        <path fill="#ACE4D6" d="M349 76.499L286 113V40z"></path>
-        <path fill="#0C3C32" d="M480 74.5L446 94V55z"></path>
-        <path fill="#1CC29F" d="M223 76.5l63 36.5V40zm182 1.999L446 102V55z"></path>
-        <path fill="#137863" d="M169 48v82l71-41z"></path>
-        <path fill="#1CC29F" d="M121 75.499L169 103V48z"></path>
-        <path fill="#373B3F" d="M456 101h-96V46z"></path>
-        <path fill="#52595F" d="M360 46v55h-96z"></path>
-        <path fill="#A473DB" d="M436 93h63V57z"></path>
-        <path fill="#D0B3EB" d="M499 57v36h63z"></path>
-        <path fill="#0C3C32" d="M491 93h84.18V44z"></path>
-        <path fill="#1CC29F" d="M575.18 93h84.179l-84.18-49z"></path>
-        <path fill="#FF2900" d="M601 94h48V66z"></path>
-        <path fill="#FF692C" d="M649 66v28h48z"></path>
-        <path fill="#FF815C" d="M170.385 93h76V49z"></path>
-        <path fill="#FF2900" d="M246.385 49v44h76z"></path>
-        <path fill="#373B3F" d="M166 93H70V38z"></path>
-        <path fill="#52595F" d="M70 38v55h-96z"></path>
-    </svg>
-</div>
-</body>
 
-</html>
+<!-- Charts -->
+<div class="chart-grid">
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3>Monthly Spending</h3>
+            <a href="/monthly" class="btn btn-outline btn-sm">View details →</a>
+        </div>
+        <div class="chart-container">
+            <canvas id="miniMonthly"></canvas>
+        </div>
+    </div>
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3>Category Breakdown</h3>
+            <a href="/categories" class="btn btn-outline btn-sm">View details →</a>
+        </div>
+        <div class="chart-container">
+            <canvas id="miniCategory"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (async () => {
+        // Dashboard summary
+        try {
+            const res = await fetch('/api/dashboard');
+            const d = await res.json();
+            document.getElementById('statOwed').textContent = d.currency + ' ' + d.you_are_owed.toLocaleString();
+            document.getElementById('statOwe').textContent = d.currency + ' ' + d.you_owe.toLocaleString();
+            document.getElementById('statGroups').textContent = d.groups_count;
+            document.getElementById('statFriends').textContent = d.friends_count;
+        } catch (e) { console.error('Dashboard API error', e); }
+
+        // Mini monthly chart
+        try {
+            const res = await fetch('/api/monthly-spending?months=6');
+            const d = await res.json();
+            const datasets = Object.entries(d.datasets).map(([name, values], i) => ({
+                label: name,
+                data: values,
+                backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                borderRadius: 4,
+            }));
+            new Chart(document.getElementById('miniMonthly'), {
+                type: 'bar',
+                data: { labels: d.labels, datasets },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, ticks: { callback: v => d.currency + ' ' + v } },
+                    },
+                },
+            });
+        } catch (e) { console.error('Monthly API error', e); }
+
+        // Mini category chart
+        try {
+            const res = await fetch('/api/category-breakdown?months=6');
+            const d = await res.json();
+            new Chart(document.getElementById('miniCategory'), {
+                type: 'doughnut',
+                data: {
+                    labels: d.labels,
+                    datasets: [{
+                        data: d.values,
+                        backgroundColor: CHART_COLORS.slice(0, d.labels.length),
+                        borderWidth: 0,
+                        hoverOffset: 8,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, padding: 12, font: { size: 11 } },
+                        },
+                    },
+                },
+            });
+        } catch (e) { console.error('Category API error', e); }
+    })();
+</script>
+{% endblock %}

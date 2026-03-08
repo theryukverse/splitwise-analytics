@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Monthly Spending — Splitwise Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1>Monthly Spending</h1>
+    <p>Your expenses grouped by month and category.</p>
+</div>
+
+<div class="card animate-in" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3>Spending Over Time</h3>
+        <select id="monthRange" class="form-select" onchange="loadMonthly()">
+            <option value="6">Last 6 months</option>
+            <option value="12" selected>Last 12 months</option>
+            <option value="24">Last 24 months</option>
+        </select>
+    </div>
+    <div class="chart-container" style="height:420px;">
+        <canvas id="monthlyChart"></canvas>
+    </div>
+</div>
+
+<div class="card animate-in">
+    <div class="card-header">
+        <h3>Data Table</h3>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table" id="monthlyTable">
+            <thead>
+                <tr id="tableHead"></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let monthlyChartInstance = null;
+
+    async function loadMonthly() {
+        const months = document.getElementById('monthRange').value;
+        const res = await fetch('/api/monthly-spending?months=' + months);
+        const d = await res.json();
+
+        // Chart
+        const datasets = Object.entries(d.datasets).map(([name, values], i) => ({
+            label: name,
+            data: values,
+            backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+            borderRadius: 4,
+        }));
+
+        if (monthlyChartInstance) monthlyChartInstance.destroy();
+        monthlyChartInstance = new Chart(document.getElementById('monthlyChart'), {
+            type: 'bar',
+            data: { labels: d.labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + d.currency + ' ' + ctx.parsed.y.toLocaleString() } },
+                },
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, ticks: { callback: v => d.currency + ' ' + v } },
+                },
+            },
+        });
+
+        // Table
+        const head = document.getElementById('tableHead');
+        const body = document.getElementById('tableBody');
+        const cats = Object.keys(d.datasets);
+        head.innerHTML = '<th>Month</th>' + cats.map(c => '<th>' + c + '</th>').join('') + '<th>Total</th>';
+        body.innerHTML = d.labels.map((m, mi) => {
+            const total = cats.reduce((s, c) => s + (d.datasets[c][mi] || 0), 0);
+            return '<tr><td>' + m + '</td>' +
+                cats.map(c => '<td>' + d.currency + ' ' + (d.datasets[c][mi] || 0).toLocaleString() + '</td>').join('') +
+                '<td style="font-weight:600;">' + d.currency + ' ' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td></tr>';
+        }).join('');
+    }
+
+    loadMonthly();
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Groups — Splitwise Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1>Groups</h1>
+    <p>All your Splitwise groups and your balance in each.</p>
+</div>
+
+<div id="groupsContainer">
+    <div class="spinner-wrap">
+        <div class="spinner"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (async () => {
+        const container = document.getElementById('groupsContainer');
+        try {
+            const res = await fetch('/api/groups');
+            if (!res.ok) throw new Error('API returned ' + res.status);
+            const groups = await res.json();
+
+            if (!groups.length) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>No groups found.</p></div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="list-grid">' + groups.map(g => {
+                const balClass = g.my_balance > 0 ? 'balance-positive' : g.my_balance < 0 ? 'balance-negative' : 'balance-zero';
+                const balText = g.my_balance > 0 ? 'you are owed' : g.my_balance < 0 ? 'you owe' : 'settled up';
+                return '<a href="/groups/' + g.id + '" class="list-item animate-in" style="text-decoration:none;color:inherit;">' +
+                    (g.cover ? '<img src="' + g.cover + '" class="item-avatar" alt="">' :
+                        '<div class="item-avatar-placeholder">' + (g.name ? g.name[0] : 'G') + '</div>') +
+                    '<div class="item-info">' +
+                    '<div class="item-name">' + g.name + '</div>' +
+                    '<div class="item-sub">' + g.members.length + ' members • ' + balText + '</div>' +
+                    '</div>' +
+                    '<div class="item-balance ' + balClass + '">' +
+                    g.currency + ' ' + Math.abs(g.my_balance).toLocaleString() +
+                    '</div>' +
+                    '</a>';
+            }).join('') + '</div>';
+        } catch (e) {
+            console.error('Groups error:', e);
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load groups. Please try refreshing.</p></div>';
+        }
+    })();
+</script>
+{% endblock %}
