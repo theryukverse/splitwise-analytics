@@ -5,6 +5,7 @@ env/
 
 # Environment Variables & Secrets
 .env
+*.env
 .env.*
 web/.env
 mcp/.env
