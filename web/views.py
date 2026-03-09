@@ -35,14 +35,16 @@ def login_required(f):
 
 @views.route("/login")
 def login():
+    session.clear()  # Clear old session data to ensure a fresh, small Set-Cookie header
     url = get_authorization_url(get_https_redirect_call_back_url(request.root_url))
     return redirect(url)
-
 
 @views.route("/callback")
 def callback():
     if session.get("state") != request.args.get("state"):
-        abort(500, "State mismatch")
+        # If the state mismatches (usually from browser caching or back-button), silently restart the login flow
+        return redirect("/login")
+        
     set_access_token(request.args["code"],
                      get_https_redirect_call_back_url(request.root_url))
     return redirect("/")

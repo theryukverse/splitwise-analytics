@@ -1,17 +1,33 @@
 # Virtual Environment
-/venv/
+venv/
 env/
+.venv/
 
-# Environment Variables
+# Environment Variables & Secrets
 .env
-.env.local
-.env.cloudflare
+.env.*
+web/.env
+mcp/.env
+*.json
+!mcp/mcp_server.py
+!package.json
+!composer.json
+!mcp/requirements.txt
+!web/requirements.txt
+
+# Specific Splitwise Caches
+.splitwise_cache.json
+web/.splitwise_cache.json
+mcp/mcp_cache.json
+mcp_cache.json
 
 # IDEs
-/.idea
+.idea/
 .vscode/
+*.swp
+*.swo
 
-# Build and Cache
+# Python / Build
 __pycache__/
 *.py[cod]
 *$py.class
@@ -22,10 +38,11 @@ dist/
 build/
 *.egg-info/
 
+# Logs
+*.log
+mcp/mcp_debug.log
+
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Logs
-*.log

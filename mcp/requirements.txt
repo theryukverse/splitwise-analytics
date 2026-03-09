@@ -1,0 +1,6 @@
+mcp[cli]
+splitwise
+python-dotenv
+python-dateutil
+starlette
+uvicorn

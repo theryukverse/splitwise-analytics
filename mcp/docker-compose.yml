@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build: .
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - PORT=5001
+      # BASE_URL should be set to your public tunnel URL in .env
+      # e.g., BASE_URL=https://splitwise-mcp.yourdomain.com
+    volumes:
+      - ./mcp_cache.json:/app/mcp_cache.json
+      - ./mcp_debug.log:/app/mcp_debug.log
+    restart: unless-stopped

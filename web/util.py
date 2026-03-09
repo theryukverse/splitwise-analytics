@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
@@ -6,8 +8,11 @@ from dotenv import load_dotenv
 from flask import session
 from splitwise import Splitwise
 
-load_dotenv()
+# Use an absolute path to .env so it works regardless of where the script is run (e.g., from Claude Desktop)
+ENV_FILE = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
 
+CACHE_FILE = Path(__file__).parent / ".splitwise_cache.json"
 
 # ---------------------------------------------------------------------------
 # OAuth helpers
@@ -15,11 +20,35 @@ load_dotenv()
 
 def get_splitwise_client():
     """Return a Splitwise client — authenticated if access_token is present."""
+    from flask import session
     key = os.getenv("CONSUMER_KEY")
     secret = os.getenv("CONSUMER_SECRET")
-    if "access_token" in session:
-        return Splitwise(consumer_key=key, consumer_secret=secret,
-                         api_key=session["access_token"])
+    
+    # Try browser session first (will fail if running as MCP server outside Flask context)
+    try:
+        if "access_token" in session:
+            # Auto-cache it for the background MCP server if it doesn't exist yet
+            if not CACHE_FILE.exists():
+                try:
+                    with open(CACHE_FILE, "w") as f:
+                        json.dump({"access_token": session["access_token"]}, f)
+                except Exception:
+                    pass
+            return Splitwise(consumer_key=key, consumer_secret=secret,
+                             api_key=session["access_token"])
+    except RuntimeError:
+        pass  # We are running outside of a web request (e.g., as an MCP tool)
+    
+    # Fallback to local cache file for MCP / webhook access
+    try:
+        if CACHE_FILE.exists():
+            with open(CACHE_FILE, "r") as f:
+                cached = json.load(f)
+                if "access_token" in cached:
+                    return Splitwise(consumer_key=key, consumer_secret=secret, api_key=cached["access_token"])
+    except Exception:
+        pass
+
     return Splitwise(consumer_key=key, consumer_secret=secret)
 
 
@@ -32,8 +61,18 @@ def get_authorization_url(redirect_uri):
 
 def set_access_token(code, redirect_uri):
     client = get_splitwise_client()
-    access_token = client.getOAuth2AccessToken(code, redirect_uri)["access_token"]
+    token_dict = client.getOAuth2AccessToken(code, redirect_uri)
+    access_token = token_dict["access_token"]
     session["access_token"] = access_token
+    
+    # Persist token for background services (MCP)
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump({"access_token": access_token}, f)
+    except Exception as e:
+        print("Failed to cache token:", e)
+    
+    return access_token
 
 
 def get_https_redirect_call_back_url(root_url):
